@@ -2,8 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../domain/entities/match.dart';
-import '../providers/match_providers.dart';
+import 'package:mundial2026/domain/entities/match.dart';
+import 'package:mundial2026/presentation/providers/match_providers.dart';
 import '../widgets/match_card.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -225,7 +225,7 @@ class _MatchList extends ConsumerWidget {
                                 color: Theme.of(context)
                                     .colorScheme
                                     .onSurface
-                                    .withOpacity(0.5),
+                                    .withValues(alpha: 0.5),
                               ),
                     ),
                   ],

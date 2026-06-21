@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../domain/entities/match.dart';
+import 'package:mundial2026/domain/entities/match.dart';
 import '../providers/match_providers.dart';
 import 'viewing_status_selector.dart';
 
@@ -91,7 +91,7 @@ class MatchCard extends ConsumerWidget {
                         Text(
                           '(${match.score.homeHalfTimeGoals}-${match.score.awayHalfTimeGoals})',
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacity(0.5),
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                           ),
                         ),
                     ],
@@ -137,7 +137,7 @@ class MatchCard extends ConsumerWidget {
             child: Text(
               '📍 ${match.venue}',
               style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -221,7 +221,7 @@ class _TeamBlock extends StatelessWidget {
         Text(
           team.tla,
           style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.5),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
           ),
         ),
       ],
@@ -249,9 +249,9 @@ class _MatchStatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
         label,
@@ -278,9 +278,9 @@ class _ViewingStatusBadge extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: _statusColor(status).withOpacity(0.1),
+          color: _statusColor(status).withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _statusColor(status).withOpacity(0.4)),
+          border: Border.all(color: _statusColor(status).withValues(alpha: 0.4)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

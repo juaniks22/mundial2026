@@ -4,12 +4,11 @@
 // Sabe cómo hablar con football-data.org v4 y transformar
 // la respuesta en entidades de dominio.
 
-import 'dart:convert';
 import 'package:dio/dio.dart';
-import '../../core/constants/api_constants.dart';
-import '../../core/errors/app_exception.dart';
-import '../../domain/entities/match.dart';
-import '../../domain/ports/remote_datasource_port.dart';
+import 'package:mundial2026/core/constants/api_constants.dart';
+import 'package:mundial2026/core/errors/app_exception.dart';
+import 'package:mundial2026/domain/entities/match.dart';
+import 'package:mundial2026/domain/ports/remote_datasource_port.dart';
 
 class FootballRemoteDataSource implements RemoteDataSourcePort {
   final Dio _dio;

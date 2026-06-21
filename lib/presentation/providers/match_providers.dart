@@ -14,12 +14,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:dio/dio.dart';
-import '../../core/constants/api_constants.dart';
-import '../../domain/entities/match.dart';
-import '../../domain/ports/match_repository_port.dart';
-import '../../data/datasources/football_remote_datasource.dart';
-import '../../data/datasources/match_local_datasource.dart';
-import '../../data/repositories/match_repository_impl.dart';
+import 'package:mundial2026/core/constants/api_constants.dart';
+import 'package:mundial2026/domain/entities/match.dart';
+import 'package:mundial2026/domain/ports/match_repository_port.dart';
+import 'package:mundial2026/data/datasources/football_remote_datasource.dart';
+import 'package:mundial2026/data/datasources/match_local_datasource.dart';
+import 'package:mundial2026/data/repositories/match_repository_impl.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INFRAESTRUCTURA

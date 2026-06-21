@@ -6,7 +6,7 @@ class ApiConstants {
   static const String baseUrl = 'https://api.football-data.org/v4';
 
   /// Obtené tu key gratuita en https://www.football-data.org/client/register
-  static const String apiKey = 'TU_API_KEY_AQUI';
+  static const String apiKey = 'a5293dba45b541dcb7163e20dd52c8dd';
 
   /// Código de competición del Mundial FIFA
   static const String worldCupCode = 'WC';

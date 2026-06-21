@@ -6,8 +6,8 @@
 //
 // Principio D de SOLID: el dominio depende de abstracciones.
 
-import '../entities/match.dart';
-import '../../core/errors/app_exception.dart';
+import 'package:mundial2026/domain/entities/match.dart';
+import 'package:mundial2026/core/errors/app_exception.dart';
 
 /// Resultado tipado: éxito con valor T o falla con AppException.
 /// Evita usar Exceptions como control de flujo en los providers.

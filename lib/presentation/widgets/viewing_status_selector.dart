@@ -1,7 +1,7 @@
 // lib/presentation/widgets/viewing_status_selector.dart
 
 import 'package:flutter/material.dart';
-import '../../domain/entities/match.dart';
+import 'package:mundial2026/domain/entities/match.dart';
 
 class ViewingStatusSelector extends StatelessWidget {
   final String matchId;
@@ -48,7 +48,7 @@ class ViewingStatusSelector extends StatelessWidget {
           Text(
             '¿Cómo viste este partido?',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 20),
@@ -90,7 +90,7 @@ class _StatusOption extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.12) : theme.cardColor,
+          color: isSelected ? color.withValues(alpha: 0.12) : theme.cardColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? color : theme.dividerColor,
