@@ -51,7 +51,7 @@ class Mundial2026App extends StatelessWidget {
           seedColor: const Color(0xFF00AA55), // verde campo de fútbol
           brightness: Brightness.dark,
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: const Color(0xFF1E1E2E),
           elevation: 2,
         ),
