@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:mundial2026/domain/entities/match.dart';
 import '../providers/match_providers.dart';
@@ -198,12 +200,19 @@ class _TeamBlock extends StatelessWidget {
       children: [
         // Crest del equipo (SVG desde football-data.org)
         if (team.crestUrl != null)
-          Image.network(
-            team.crestUrl!,
-            width: 36,
-            height: 36,
-            errorBuilder: (_, __, ___) => const Icon(Icons.shield, size: 36),
-          )
+          team.crestUrl!.endsWith('.svg')
+              ? SvgPicture.network(
+                  team.crestUrl!,
+                  width: 36,
+                  height: 36,
+                  placeholderBuilder: (_) => const Icon(Icons.shield, size: 36),
+                )
+              : CachedNetworkImage(
+                  imageUrl: team.crestUrl!,
+                  width: 36,
+                  height: 36,
+                  errorWidget: (_, __, ___) => const Icon(Icons.shield, size: 36),
+                )
         else
           const Icon(Icons.shield_outlined, size: 36),
 
@@ -303,7 +312,7 @@ class _ViewingStatusBadge extends StatelessWidget {
 
   Color _statusColor(UserViewingStatus s) => switch (s) {
     UserViewingStatus.notWatched => Colors.red,
-    UserViewingStatus.halfTime   => Colors.amber,
+    UserViewingStatus.halfTime   => const Color(0xFF51EB2F),
     UserViewingStatus.watched    => Colors.green,
     UserViewingStatus.summary    => Colors.blue,
   };

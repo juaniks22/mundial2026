@@ -7,6 +7,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'core/constants/api_constants.dart';
 import 'presentation/screens/home_screen.dart';
@@ -42,26 +43,38 @@ class Mundial2026App extends StatelessWidget {
     return MaterialApp(
       title: 'Mundial 2026',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.dark,
+      themeMode: ThemeMode.light,
 
-      // ── Tema oscuro (fútbol = noche) ──────────────────────────────────
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00AA55), // verde campo de fútbol
-          brightness: Brightness.dark,
-        ),
-        cardTheme: const CardThemeData(
-          color: Color(0xFF1E1E2E),
-          elevation: 2,
-        ),
-      ),
-
-      // ── Tema claro (fallback) ─────────────────────────────────────────
+      // ── Tema Claro (Estilo Mercado Pago) ──────────────────────────────
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00AA55),
+          seedColor: const Color(0xFF009EE3), // Azul Mercado Pago
+          primary: const Color(0xFF009EE3),
+          surface: const Color(0xFFFFFFFF),
+          onSurface: const Color(0xFF1A1A1A),
+          brightness: Brightness.light,
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+        textTheme: GoogleFonts.interTextTheme(
+          Theme.of(context).textTheme,
+        ).apply(
+          bodyColor: const Color(0xFF1A1A1A),
+          displayColor: const Color(0xFF1A1A1A),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFFFFFFF),
+          foregroundColor: Color(0xFF1A1A1A),
+          elevation: 1,
+          centerTitle: false,
+        ),
+        cardTheme: const CardThemeData(
+          color: Color(0xFFFFFFFF),
+          elevation: 1,
+          margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
         ),
       ),
 

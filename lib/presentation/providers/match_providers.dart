@@ -11,6 +11,8 @@
 //   filterStateProvider      → FilterState (filtros activos)
 //   filteredMatchesProvider  → List<Match> derivada con filtros aplicados
 
+import 'dart:convert';
+import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:dio/dio.dart';
@@ -45,6 +47,14 @@ final matchRepositoryProvider = Provider<MatchRepositoryPort>((ref) {
     local: ref.watch(localDataSourceProvider),
   );
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DASHBOARD & CALENDAR STATE
+// ═══════════════════════════════════════════════════════════════════════════
+
+final dashboardExpandedProvider = StateProvider<bool>((ref) => true);
+
+final selectedDateProvider = StateProvider<DateTime?>((ref) => null);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ESTADO DE FILTROS
@@ -131,6 +141,69 @@ class MatchesNotifier extends AsyncNotifier<List<Match>> {
           .toList(),
     );
   }
+
+  /// Rellena aleatoriamente los estados de los partidos finalizados
+  Future<void> randomFillFinishedMatches() async {
+    final matches = state.valueOrNull;
+    if (matches == null) return;
+
+    final random = Random();
+    final updatedMatches = [...matches];
+    bool hasChanges = false;
+
+    for (int i = 0; i < updatedMatches.length; i++) {
+      final m = updatedMatches[i];
+      if (m.status == MatchStatus.finished) {
+        final rand = random.nextDouble();
+        UserViewingStatus newStatus;
+        if (rand < 0.1) {
+          newStatus = UserViewingStatus.notWatched;
+        } else if (rand < 0.3) {
+          newStatus = UserViewingStatus.halfTime;
+        } else if (rand < 0.7) {
+          newStatus = UserViewingStatus.watched;
+        } else {
+          newStatus = UserViewingStatus.summary;
+        }
+
+        if (m.userViewingStatus != newStatus) {
+          await ref
+              .read(matchRepositoryProvider)
+              .updateViewingStatus(m.id, newStatus);
+          updatedMatches[i] = m.copyWith(userViewingStatus: newStatus);
+          hasChanges = true;
+        }
+      }
+    }
+
+    if (hasChanges) {
+      state = AsyncData(updatedMatches);
+    }
+  }
+
+  /// Exporta el estado local a JSON
+  String exportStatusesJson() {
+    final statuses = ref.read(localDataSourceProvider).readAllViewingStatuses();
+    final map = statuses.map((k, v) => MapEntry(k, v.index));
+    return jsonEncode(map);
+  }
+
+  /// Importa el estado desde JSON
+  Future<void> importStatusesJson(String jsonStr) async {
+    try {
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      for (final entry in map.entries) {
+        final matchId = entry.key;
+        final statusIndex = entry.value as int;
+        if (statusIndex >= 0 && statusIndex < UserViewingStatus.values.length) {
+          final status = UserViewingStatus.values[statusIndex];
+          await updateViewingStatus(matchId, status);
+        }
+      }
+    } catch (e) {
+      throw Exception('Formato de JSON inválido');
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -158,17 +231,76 @@ final filteredMatchesProvider = Provider<AsyncValue<List<Match>>>((ref) {
   });
 });
 
-/// Partidos agrupados por fase (para la UI tipo calendario por etapa).
-final matchesByStageProvider = Provider<AsyncValue<Map<MatchStage, List<Match>>>>((ref) {
-  return ref.watch(filteredMatchesProvider).whenData((matches) {
-    final grouped = <MatchStage, List<Match>>{};
-    for (final m in matches) {
-      grouped.putIfAbsent(m.stage, () => []).add(m);
-    }
-    // Ordenar cada grupo por fecha
-    for (final stage in grouped.keys) {
-      grouped[stage]!.sort((a, b) => a.utcDate.compareTo(b.utcDate));
-    }
-    return grouped;
+// ═══════════════════════════════════════════════════════════════════════════
+// CALENDAR & GROUPING PROVIDERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+DateTime _normalizeDate(DateTime date) {
+  final local = date.toLocal();
+  return DateTime(local.year, local.month, local.day);
+}
+
+final availableDatesProvider = Provider<AsyncValue<List<DateTime>>>((ref) {
+  return ref.watch(matchesNotifierProvider).whenData((matches) {
+    final dates = matches.map((m) => _normalizeDate(m.utcDate)).toSet().toList();
+    dates.sort();
+    return dates;
   });
+});
+
+final matchesByDayProvider = Provider<AsyncValue<Map<DateTime, List<Match>>>>((ref) {
+  final selectedDate = ref.watch(selectedDateProvider);
+  return ref.watch(filteredMatchesProvider).whenData((matches) {
+    final grouped = <DateTime, List<Match>>{};
+    
+    var filtered = matches;
+    if (selectedDate != null) {
+      filtered = matches.where((m) => _normalizeDate(m.utcDate) == selectedDate).toList();
+    }
+
+    for (final m in filtered) {
+      final day = _normalizeDate(m.utcDate);
+      grouped.putIfAbsent(day, () => []).add(m);
+    }
+    
+    // Sort keys (days)
+    final sortedGrouped = <DateTime, List<Match>>{};
+    final sortedDays = grouped.keys.toList()..sort();
+    
+    for (final day in sortedDays) {
+      grouped[day]!.sort((a, b) => a.utcDate.compareTo(b.utcDate));
+      sortedGrouped[day] = grouped[day]!;
+    }
+    return sortedGrouped;
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATS PROVIDERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+final worldCupProgressProvider = Provider<double>((ref) {
+  final matches = ref.watch(matchesNotifierProvider).valueOrNull ?? [];
+  if (matches.isEmpty) return 0.0;
+  final finished = matches.where((m) => m.status == MatchStatus.finished).length;
+  return finished / matches.length;
+});
+
+final viewingStatsProvider = Provider<Map<UserViewingStatus, double>>((ref) {
+  final matches = ref.watch(matchesNotifierProvider).valueOrNull ?? [];
+  final stats = {
+    UserViewingStatus.notWatched: 0.0,
+    UserViewingStatus.halfTime: 0.0,
+    UserViewingStatus.watched: 0.0,
+    UserViewingStatus.summary: 0.0,
+  };
+  if (matches.isEmpty) return stats;
+
+  for (final m in matches) {
+    stats[m.userViewingStatus] = (stats[m.userViewingStatus] ?? 0) + 1;
+  }
+  for (final key in stats.keys.toList()) {
+    stats[key] = stats[key]! / matches.length;
+  }
+  return stats;
 });

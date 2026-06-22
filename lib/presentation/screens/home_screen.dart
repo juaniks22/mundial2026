@@ -1,7 +1,9 @@
 // lib/presentation/screens/home_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:mundial2026/domain/entities/match.dart';
 import 'package:mundial2026/presentation/providers/match_providers.dart';
 import '../widgets/match_card.dart';
@@ -11,7 +13,7 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final matchesAsync = ref.watch(filteredMatchesProvider);
+    final matchesAsync = ref.watch(matchesByDayProvider);
     final filter = ref.watch(filterStateProvider);
 
     return Scaffold(
@@ -25,10 +27,28 @@ class HomeScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.auto_fix_high),
+            tooltip: 'Auto-rellenar simulado',
+            onPressed: () => _confirmAutoFill(context, ref),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Sincronizar',
-            onPressed: () =>
-                ref.read(matchesNotifierProvider.notifier).refresh(),
+            onPressed: () => ref.read(matchesNotifierProvider.notifier).refresh(),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'export') {
+                _showExportDialog(context, ref);
+              } else if (value == 'import') {
+                _showImportDialog(context, ref);
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'export', child: Text('Exportar datos (.json)')),
+              PopupMenuItem(value: 'import', child: Text('Importar datos (.json)')),
+            ],
           ),
         ],
         bottom: PreferredSize(
@@ -36,19 +56,154 @@ class HomeScreen extends ConsumerWidget {
           child: _FilterBar(currentFilter: filter),
         ),
       ),
-      body: matchesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => _ErrorState(
-          message: err.toString(),
-          onRetry: () =>
-              ref.read(matchesNotifierProvider.notifier).refresh(),
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(matchesNotifierProvider.notifier).refresh(),
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 24),
+          children: [
+            const _DashboardPanel(),
+            const _DateSelector(),
+            matchesAsync.when(
+              loading: () => const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+              error: (err, _) => _ErrorState(
+                message: err.toString(),
+                onRetry: () => ref.read(matchesNotifierProvider.notifier).refresh(),
+              ),
+              data: (groupedMatches) {
+                if (groupedMatches.isEmpty) {
+                  return const _EmptyState();
+                }
+                return _MatchList(groupedMatches: groupedMatches);
+              },
+            ),
+          ],
         ),
-        data: (matches) {
-          if (matches.isEmpty) {
-            return const _EmptyState();
-          }
-          return _MatchList(matches: matches);
-        },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Dashboard Colapsable
+// ─────────────────────────────────────────────────────────────────────────
+
+class _DashboardPanel extends ConsumerWidget {
+  const _DashboardPanel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isExpanded = ref.watch(dashboardExpandedProvider);
+    final progress = ref.watch(worldCupProgressProvider);
+    final stats = ref.watch(viewingStatsProvider);
+    final theme = Theme.of(context);
+
+    return Card(
+      margin: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => ref.read(dashboardExpandedProvider.notifier).state = !isExpanded,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Icon(Icons.bar_chart, color: Color(0xFF009EE3)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Dashboard de Estadísticas',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity, height: 0),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Mundial jugado: ${(progress * 100).toStringAsFixed(1)}%'),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: theme.dividerColor.withValues(alpha: 0.2),
+                    color: const Color(0xFF009EE3),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Tus visualizaciones:'),
+                  const SizedBox(height: 8),
+                  _StatBar(
+                    label: 'No visto',
+                    value: stats[UserViewingStatus.notWatched] ?? 0.0,
+                    color: Colors.red,
+                  ),
+                  _StatBar(
+                    label: 'Medio tiempo',
+                    value: stats[UserViewingStatus.halfTime] ?? 0.0,
+                    color: const Color(0xFF51EB2F),
+                  ),
+                  _StatBar(
+                    label: 'Visto',
+                    value: stats[UserViewingStatus.watched] ?? 0.0,
+                    color: Colors.green,
+                  ),
+                  _StatBar(
+                    label: 'Resumen',
+                    value: stats[UserViewingStatus.summary] ?? 0.0,
+                    color: Colors.blue,
+                  ),
+                ],
+              ),
+            ),
+            crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatBar extends StatelessWidget {
+  final String label;
+  final double value;
+  final Color color;
+
+  const _StatBar({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(width: 90, child: Text(label, style: const TextStyle(fontSize: 12))),
+          Expanded(
+            child: LinearProgressIndicator(
+              value: value,
+              backgroundColor: Colors.grey.shade200,
+              color: color,
+            ),
+          ),
+          SizedBox(
+            width: 40,
+            child: Text(
+              '${(value * 100).toStringAsFixed(0)}%',
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -172,73 +327,167 @@ class _FilterChip extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Lista agrupada por fase
+// Selector de Fecha (Dual: Scroll horizontal + DatePicker)
 // ─────────────────────────────────────────────────────────────────────────
 
-class _MatchList extends ConsumerWidget {
-  final List<Match> matches;
-
-  const _MatchList({required this.matches});
+class _DateSelector extends ConsumerWidget {
+  const _DateSelector();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Agrupar por fase
-    final grouped = <MatchStage, List<Match>>{};
-    for (final m in matches) {
-      grouped.putIfAbsent(m.stage, () => []).add(m);
-    }
+    final availableDatesAsync = ref.watch(availableDatesProvider);
+    final selectedDate = ref.watch(selectedDateProvider);
 
-    // Ordenar fases en orden del torneo
-    final orderedStages = MatchStage.values.where(grouped.containsKey).toList();
+    return availableDatesAsync.when(
+      data: (dates) {
+        if (dates.isEmpty) return const SizedBox.shrink();
 
-    return RefreshIndicator(
-      onRefresh: () => ref.read(matchesNotifierProvider.notifier).refresh(),
-      child: ListView.builder(
-        padding: const EdgeInsets.only(bottom: 24),
-        itemCount: orderedStages.length,
-        itemBuilder: (context, index) {
-          final stage = orderedStages[index];
-          final stageMatches = grouped[stage]!;
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header de la fase
-              Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        stage.label,
-                        style:
-                            Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                      ),
-                    ),
-                    Text(
-                      '${stageMatches.length} partidos',
-                      style:
-                          Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withValues(alpha: 0.5),
-                              ),
-                    ),
-                  ],
-                ),
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Filtrar por fecha:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.calendar_month, color: Color(0xFF009EE3)),
+                    onPressed: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate ?? dates.first,
+                        firstDate: dates.first,
+                        lastDate: dates.last,
+                      );
+                      if (date != null) {
+                        ref.read(selectedDateProvider.notifier).state = date;
+                      }
+                    },
+                  ),
+                ],
               ),
+            ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  _DateChip(
+                    label: 'Todos',
+                    isSelected: selectedDate == null,
+                    onTap: () => ref.read(selectedDateProvider.notifier).state = null,
+                  ),
+                  for (final date in dates)
+                    _DateChip(
+                      label: DateFormat('d MMM').format(date),
+                      isSelected: selectedDate == date,
+                      onTap: () => ref.read(selectedDateProvider.notifier).state = date,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
 
-              // Partidos de la fase
-              ...stageMatches.map((m) => MatchCard(match: m)),
-            ],
-          );
-        },
+class _DateChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _DateChip({required this.label, required this.isSelected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (_) => onTap(),
+        selectedColor: theme.colorScheme.primary,
+        labelStyle: TextStyle(
+          color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
+        ),
       ),
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Lista agrupada por día
+// ─────────────────────────────────────────────────────────────────────────
+
+class _MatchList extends StatelessWidget {
+  final Map<DateTime, List<Match>> groupedMatches;
+
+  const _MatchList({required this.groupedMatches});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: groupedMatches.entries.map((entry) {
+        final date = entry.key;
+        final matches = entry.value;
+        final simpleDate = '${_weekDay(date.weekday)} ${date.day} de ${_month(date.month)}';
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+              child: Text(
+                simpleDate,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+            ),
+            ...matches.map((m) => MatchCard(match: m)),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  String _weekDay(int w) {
+    switch (w) {
+      case 1: return 'Lunes';
+      case 2: return 'Martes';
+      case 3: return 'Miércoles';
+      case 4: return 'Jueves';
+      case 5: return 'Viernes';
+      case 6: return 'Sábado';
+      case 7: return 'Domingo';
+      default: return '';
+    }
+  }
+
+  String _month(int m) {
+    switch (m) {
+      case 1: return 'Enero';
+      case 2: return 'Febrero';
+      case 3: return 'Marzo';
+      case 4: return 'Abril';
+      case 5: return 'Mayo';
+      case 6: return 'Junio';
+      case 7: return 'Julio';
+      case 8: return 'Agosto';
+      case 9: return 'Septiembre';
+      case 10: return 'Octubre';
+      case 11: return 'Noviembre';
+      case 12: return 'Diciembre';
+      default: return '';
+    }
   }
 }
 
@@ -286,14 +535,140 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('⚽', style: TextStyle(fontSize: 48)),
-          SizedBox(height: 12),
-          Text('No hay partidos con esos filtros'),
-        ],
+      child: Padding(
+        padding: EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('⚽', style: TextStyle(fontSize: 48)),
+            SizedBox(height: 12),
+            Text('No hay partidos con esos filtros'),
+          ],
+        ),
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Diálogos y utilidades
+// ─────────────────────────────────────────────────────────────────────────
+
+Future<void> _confirmAutoFill(BuildContext context, WidgetRef ref) async {
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('¿Auto-rellenar?'),
+      content: const Text(
+          'Esto asignará estados aleatorios a los partidos finalizados y sobrescribirá tus estados actuales para esos partidos. ¿Estás seguro?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Sí, rellenar'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirm == true) {
+    ref.read(matchesNotifierProvider.notifier).randomFillFinishedMatches();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Partidos rellenados aleatoriamente')),
+      );
+    }
+  }
+}
+
+void _showExportDialog(BuildContext context, WidgetRef ref) {
+  final jsonStr = ref.read(matchesNotifierProvider.notifier).exportStatusesJson();
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Exportar Datos'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Copiá el siguiente texto y guardalo en un lugar seguro para poder restaurarlo luego.'),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(8),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            height: 100,
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: SelectableText(jsonStr, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cerrar'),
+        ),
+        FilledButton.icon(
+          icon: const Icon(Icons.copy),
+          label: const Text('Copiar JSON'),
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: jsonStr));
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copiado al portapapeles')));
+            Navigator.pop(context);
+          },
+        ),
+      ],
+    ),
+  );
+}
+
+void _showImportDialog(BuildContext context, WidgetRef ref) {
+  final controller = TextEditingController();
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Importar Datos'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Pegá el JSON que exportaste anteriormente:'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: controller,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: '{"match_id": 1, ...}',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton.icon(
+          icon: const Icon(Icons.download),
+          label: const Text('Importar'),
+          onPressed: () async {
+            try {
+              await ref.read(matchesNotifierProvider.notifier).importStatusesJson(controller.text);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Datos importados correctamente')));
+                Navigator.pop(context);
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error: JSON inválido'), backgroundColor: Colors.red));
+              }
+            }
+          },
+        ),
+      ],
+    ),
+  );
 }

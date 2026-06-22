@@ -121,7 +121,7 @@ class _StatusOption extends StatelessWidget {
 
   Color _statusColor(UserViewingStatus s) => switch (s) {
     UserViewingStatus.notWatched => Colors.red,
-    UserViewingStatus.halfTime   => Colors.amber,
+    UserViewingStatus.halfTime   => const Color(0xFF51EB2F),
     UserViewingStatus.watched    => Colors.green,
     UserViewingStatus.summary    => Colors.blue,
   };
