@@ -136,47 +136,70 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFFFFFF),
-      body: Center(
+      body: SafeArea(
         child: FadeTransition(
           opacity: _fadeIn,
           child: ScaleTransition(
             scale: _scale,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Image.asset(
-                    'fifa logo wc26.jpg',
-                    width: 160,
-                    height: 160,
-                    fit: BoxFit.cover,
-                  ),
+                const Spacer(),
+                // Main content
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        'fifa logo wc26.jpg',
+                        width: 140,
+                        height: 140,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Mundial 2026',
+                      style: GoogleFonts.inter(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Aguantee Boocaa',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: const Color(0xFF009EE3),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Color(0xFF009EE3),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  'Mundial 2026',
-                  style: GoogleFonts.inter(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF1A1A1A),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Aguantee Boocaa',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: const Color(0xFF009EE3),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: Color(0xFF009EE3),
+                const Spacer(),
+                // Bottom Messi image
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.asset(
+                        'messi levantando copa del mundo.jpg',
+                        height: 230,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                   ),
                 ),
               ],

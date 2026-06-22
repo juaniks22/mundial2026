@@ -31,6 +31,7 @@ flutter:
   uses-material-design: true
   assets:
     - fifa logo wc26.jpg
+    - messi levantando copa del mundo.jpg
 
 dev_dependencies:
   flutter_test:
