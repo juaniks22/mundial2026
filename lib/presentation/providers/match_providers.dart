@@ -54,7 +54,10 @@ final matchRepositoryProvider = Provider<MatchRepositoryPort>((ref) {
 
 final dashboardExpandedProvider = StateProvider<bool>((ref) => true);
 
-final selectedDateProvider = StateProvider<DateTime?>((ref) => null);
+final selectedDateProvider = StateProvider<DateTime?>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ESTADO DE FILTROS
@@ -304,3 +307,42 @@ final viewingStatsProvider = Provider<Map<UserViewingStatus, double>>((ref) {
   }
   return stats;
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MIS ESTADÍSTICAS (solo partidos finalizados con estado cargado por el usuario)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Estadísticas personales del usuario: cuántos partidos finalizados marcó
+/// con cada estado. Solo cuenta partidos con status == finished.
+final myStatsProvider = Provider<Map<String, dynamic>>((ref) {
+  final matches = ref.watch(matchesNotifierProvider).valueOrNull ?? [];
+  final finished = matches.where((m) => m.status == MatchStatus.finished).toList();
+  
+  final counts = {
+    UserViewingStatus.notWatched: 0,
+    UserViewingStatus.halfTime: 0,
+    UserViewingStatus.watched: 0,
+    UserViewingStatus.summary: 0,
+  };
+  
+  for (final m in finished) {
+    counts[m.userViewingStatus] = (counts[m.userViewingStatus] ?? 0) + 1;
+  }
+  
+  final totalFinished = finished.length;
+  final totalTracked = totalFinished - (counts[UserViewingStatus.notWatched] ?? 0);
+  
+  final percentages = <UserViewingStatus, double>{};
+  for (final entry in counts.entries) {
+    percentages[entry.key] = totalFinished > 0 ? entry.value / totalFinished : 0.0;
+  }
+  
+  return {
+    'totalFinished': totalFinished,
+    'totalTracked': totalTracked,
+    'counts': counts,
+    'percentages': percentages,
+  };
+});
+
+final myStatsExpandedProvider = StateProvider<bool>((ref) => false);

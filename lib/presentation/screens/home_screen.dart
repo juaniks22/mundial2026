@@ -18,19 +18,22 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           children: [
-            Text('🏆', style: TextStyle(fontSize: 22)),
-            SizedBox(width: 8),
-            Text('Mundial 2026', style: TextStyle(fontWeight: FontWeight.bold)),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.asset(
+                'fifa logo wc26.jpg',
+                width: 32,
+                height: 32,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text('Mundial 2026', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.auto_fix_high),
-            tooltip: 'Auto-rellenar simulado',
-            onPressed: () => _confirmAutoFill(context, ref),
-          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Sincronizar',
@@ -43,9 +46,18 @@ class HomeScreen extends ConsumerWidget {
                 _showExportDialog(context, ref);
               } else if (value == 'import') {
                 _showImportDialog(context, ref);
+              } else if (value == 'autofill') {
+                _confirmAutoFill(context, ref);
               }
             },
             itemBuilder: (context) => const [
+              PopupMenuItem(value: 'autofill', child: Row(
+                children: [
+                  Icon(Icons.auto_fix_high, size: 20),
+                  SizedBox(width: 8),
+                  Text('Auto-rellenar'),
+                ],
+              )),
               PopupMenuItem(value: 'export', child: Text('Exportar datos (.json)')),
               PopupMenuItem(value: 'import', child: Text('Importar datos (.json)')),
             ],
@@ -62,6 +74,7 @@ class HomeScreen extends ConsumerWidget {
           padding: const EdgeInsets.only(bottom: 24),
           children: [
             const _DashboardPanel(),
+            const _MyStatsPanel(),
             const _DateSelector(),
             matchesAsync.when(
               loading: () => const Center(
@@ -210,6 +223,173 @@ class _StatBar extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Mis Estadísticas (partidos finalizados cargados por el usuario)
+// ─────────────────────────────────────────────────────────────────────────
+
+class _MyStatsPanel extends ConsumerWidget {
+  const _MyStatsPanel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isExpanded = ref.watch(myStatsExpandedProvider);
+    final myStats = ref.watch(myStatsProvider);
+    final theme = Theme.of(context);
+
+    final totalFinished = myStats['totalFinished'] as int;
+    final totalTracked = myStats['totalTracked'] as int;
+    final counts = myStats['counts'] as Map<UserViewingStatus, int>;
+    final percentages = myStats['percentages'] as Map<UserViewingStatus, double>;
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => ref.read(myStatsExpandedProvider.notifier).state = !isExpanded,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Icon(Icons.person, color: Color(0xFF009EE3)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Mis Estadísticas',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity, height: 0),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Partidos finalizados: ',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      Text(
+                        '$totalFinished',
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        'Seguimiento realizado: ',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      Text(
+                        '$totalTracked / $totalFinished',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF009EE3),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Desglose de partidos finalizados:'),
+                  const SizedBox(height: 8),
+                  _MyStatRow(
+                    emoji: '🟢',
+                    label: 'Visto completo',
+                    count: counts[UserViewingStatus.watched] ?? 0,
+                    percentage: percentages[UserViewingStatus.watched] ?? 0.0,
+                    color: Colors.green,
+                  ),
+                  _MyStatRow(
+                    emoji: '🟡',
+                    label: 'Medio tiempo',
+                    count: counts[UserViewingStatus.halfTime] ?? 0,
+                    percentage: percentages[UserViewingStatus.halfTime] ?? 0.0,
+                    color: const Color(0xFF51EB2F),
+                  ),
+                  _MyStatRow(
+                    emoji: '🔵',
+                    label: 'Vi el resumen',
+                    count: counts[UserViewingStatus.summary] ?? 0,
+                    percentage: percentages[UserViewingStatus.summary] ?? 0.0,
+                    color: Colors.blue,
+                  ),
+                  _MyStatRow(
+                    emoji: '🔴',
+                    label: 'No visto',
+                    count: counts[UserViewingStatus.notWatched] ?? 0,
+                    percentage: percentages[UserViewingStatus.notWatched] ?? 0.0,
+                    color: Colors.red,
+                  ),
+                ],
+              ),
+            ),
+            crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MyStatRow extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final int count;
+  final double percentage;
+  final Color color;
+
+  const _MyStatRow({
+    required this.emoji,
+    required this.label,
+    required this.count,
+    required this.percentage,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 14)),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 100,
+            child: Text(label, style: const TextStyle(fontSize: 12)),
+          ),
+          Expanded(
+            child: LinearProgressIndicator(
+              value: percentage,
+              backgroundColor: Colors.grey.shade200,
+              color: color,
+            ),
+          ),
+          SizedBox(
+            width: 60,
+            child: Text(
+              '$count (${(percentage * 100).toStringAsFixed(0)}%)',
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Barra de filtros
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -224,7 +404,6 @@ class _FilterBar extends ConsumerWidget {
 
     return Column(
       children: [
-        // Fila 1: Estado oficial del partido
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -253,6 +432,8 @@ class _FilterBar extends ConsumerWidget {
             ],
           ),
         ),
+
+        const SizedBox(height: 6),
 
         // Fila 2: Estado de visualización personal
         SingleChildScrollView(
