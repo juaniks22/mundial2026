@@ -22,6 +22,12 @@ import 'package:mundial2026/domain/ports/match_repository_port.dart';
 import 'package:mundial2026/data/datasources/football_remote_datasource.dart';
 import 'package:mundial2026/data/datasources/match_local_datasource.dart';
 import 'package:mundial2026/data/repositories/match_repository_impl.dart';
+import 'package:mundial2026/domain/entities/standing.dart';
+import 'package:mundial2026/domain/usecases/get_matches_usecase.dart';
+import 'package:mundial2026/domain/usecases/update_viewing_status_usecase.dart';
+import 'package:mundial2026/domain/usecases/force_refresh_matches_usecase.dart';
+import 'package:mundial2026/domain/usecases/get_all_viewing_statuses_usecase.dart';
+import 'package:mundial2026/domain/usecases/get_standings_usecase.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INFRAESTRUCTURA
@@ -46,6 +52,44 @@ final matchRepositoryProvider = Provider<MatchRepositoryPort>((ref) {
     remote: ref.watch(remoteDataSourceProvider),
     local: ref.watch(localDataSourceProvider),
   );
+});
+
+// Use‑case providers
+final getMatchesUseCaseProvider = Provider<GetMatchesUseCase>((ref) =>
+    GetMatchesUseCase(ref.read(matchRepositoryProvider)));
+
+final updateViewingStatusUseCaseProvider = Provider<UpdateViewingStatusUseCase>((ref) =>
+    UpdateViewingStatusUseCase(ref.read(matchRepositoryProvider)));
+
+final forceRefreshMatchesUseCaseProvider = Provider<ForceRefreshMatchesUseCase>((ref) =>
+    ForceRefreshMatchesUseCase(ref.read(matchRepositoryProvider)));
+
+final getAllViewingStatusesUseCaseProvider = Provider<GetAllViewingStatusesUseCase>((ref) =>
+    GetAllViewingStatusesUseCase(ref.read(matchRepositoryProvider)));
+
+final getStandingsUseCaseProvider = Provider<GetStandingsUseCase>((ref) =>
+    GetStandingsUseCase(ref.read(matchRepositoryProvider)));
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CHART MODE (false = barras lineales, true = gráfico de torta)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Alterna entre vista de barras y vista de torta en los paneles de stats.
+final chartModeProvider = StateProvider<bool>((ref) => false);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STANDINGS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Carga las tablas de posiciones de todos los grupos.
+final standingsProvider = FutureProvider<List<GroupStanding>>((ref) {
+  return ref.read(getStandingsUseCaseProvider).call();
+});
+
+/// Terceros de cada grupo, ordenados por puntos > DG > GF.
+final bestThirdPlaceProvider = FutureProvider<List<GroupStanding>>((ref) {
+  return ref.read(getStandingsUseCaseProvider).getBestThirdPlace();
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -115,14 +159,14 @@ final matchesNotifierProvider =
 class MatchesNotifier extends AsyncNotifier<List<Match>> {
   @override
   Future<List<Match>> build() async {
-    return ref.watch(matchRepositoryProvider).matches();
+    return ref.read(getMatchesUseCaseProvider).call();
   }
 
   /// Fuerza sincronización con la API.
   Future<void> refresh() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () => ref.read(matchRepositoryProvider).forceRefresh(),
+      () => ref.read(forceRefreshMatchesUseCaseProvider).call(),
     );
   }
 
@@ -132,10 +176,8 @@ class MatchesNotifier extends AsyncNotifier<List<Match>> {
     String matchId,
     UserViewingStatus newStatus,
   ) async {
-    // Persiste en Hive
-    await ref
-        .read(matchRepositoryProvider)
-        .updateViewingStatus(matchId, newStatus);
+    // Persiste en Hive via use case
+    await ref.read(updateViewingStatusUseCaseProvider).call(matchId, newStatus);
 
     // Actualiza la lista en memoria sin re-fetch
     state = state.whenData(
@@ -171,8 +213,8 @@ class MatchesNotifier extends AsyncNotifier<List<Match>> {
 
         if (m.userViewingStatus != newStatus) {
           await ref
-              .read(matchRepositoryProvider)
-              .updateViewingStatus(m.id, newStatus);
+                .read(updateViewingStatusUseCaseProvider)
+                .call(m.id, newStatus);
           updatedMatches[i] = m.copyWith(userViewingStatus: newStatus);
           hasChanges = true;
         }
@@ -185,8 +227,8 @@ class MatchesNotifier extends AsyncNotifier<List<Match>> {
   }
 
   /// Exporta el estado local a JSON
-  String exportStatusesJson() {
-    final statuses = ref.read(localDataSourceProvider).readAllViewingStatuses();
+  Future<String> exportStatusesJson() async {
+    final statuses = await ref.read(getAllViewingStatusesUseCaseProvider).call();
     final map = statuses.map((k, v) => MapEntry(k, v.index));
     return jsonEncode(map);
   }

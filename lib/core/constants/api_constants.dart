@@ -20,6 +20,9 @@ class ApiConstants {
   static const String matchesEndpoint =
       '$baseUrl/competitions/$worldCupCode/matches';
 
+  static const String standingsEndpoint =
+      '$baseUrl/competitions/$worldCupCode/standings';
+
   /// Duración máxima antes de considerar el caché desactualizado.
   /// Para partidos en vivo usamos menos tiempo.
   static const Duration cacheMaxAge = Duration(minutes: 5);

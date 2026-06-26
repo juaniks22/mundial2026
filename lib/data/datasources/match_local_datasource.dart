@@ -13,6 +13,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/errors/app_exception.dart';
 import '../../domain/entities/match.dart';
+import '../../data/models/match_model.dart';
 import '../../domain/ports/local_datasource_port.dart';
 
 class MatchLocalDataSource implements LocalDataSourcePort {
@@ -90,7 +91,7 @@ class MatchLocalDataSource implements LocalDataSourcePort {
 
       final jsonList = jsonDecode(raw) as List<dynamic>;
       return jsonList
-          .map((m) => Match.fromCacheJson(m as Map<String, dynamic>))
+          .map((m) => MatchSerialization.fromCacheJson(m as Map<String, dynamic>))
           .toList();
     } catch (e) {
       // Cache corrupto → lo tratamos como ausente

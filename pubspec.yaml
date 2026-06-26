@@ -26,6 +26,7 @@ dependencies:
   flutter_svg: ^2.0.10    # crests de football-data.org son SVG
   intl: ^0.19.0
   google_fonts: ^6.1.0
+  fl_chart: ^1.2.0
 
 flutter:
   uses-material-design: true

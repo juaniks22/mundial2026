@@ -1,8 +1,11 @@
 // lib/presentation/screens/home_screen.dart
 
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:mundial2026/domain/entities/match.dart';
 import 'package:mundial2026/presentation/providers/match_providers.dart';
@@ -39,28 +42,45 @@ class HomeScreen extends ConsumerWidget {
             tooltip: 'Sincronizar',
             onPressed: () => ref.read(matchesNotifierProvider.notifier).refresh(),
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              if (value == 'export') {
-                _showExportDialog(context, ref);
-              } else if (value == 'import') {
-                _showImportDialog(context, ref);
-              } else if (value == 'autofill') {
-                _confirmAutoFill(context, ref);
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'autofill', child: Row(
-                children: [
-                  Icon(Icons.auto_fix_high, size: 20),
-                  SizedBox(width: 8),
-                  Text('Auto-rellenar'),
+          Consumer(
+            builder: (context, ref, _) {
+              final isPie = ref.watch(chartModeProvider);
+              return PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (value) {
+                  if (value == 'export') {
+                    _showExportDialog(context, ref);
+                  } else if (value == 'import') {
+                    _showImportDialog(context, ref);
+                  } else if (value == 'autofill') {
+                    _confirmAutoFill(context, ref);
+                  } else if (value == 'chart_toggle') {
+                    ref.read(chartModeProvider.notifier).state = !isPie;
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'chart_toggle',
+                    child: Row(
+                      children: [
+                        Icon(isPie ? Icons.show_chart : Icons.pie_chart, size: 20),
+                        const SizedBox(width: 8),
+                        Text(isPie ? 'Ver gráfico de líneas' : 'Ver gráfico de torta'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(value: 'autofill', child: Row(
+                    children: [
+                      Icon(Icons.auto_fix_high, size: 20),
+                      SizedBox(width: 8),
+                      Text('Auto-rellenar'),
+                    ],
+                  )),
+                  const PopupMenuItem(value: 'export', child: Text('Exportar datos (.json)')),
+                  const PopupMenuItem(value: 'import', child: Text('Importar datos (.json)')),
                 ],
-              )),
-              PopupMenuItem(value: 'export', child: Text('Exportar datos (.json)')),
-              PopupMenuItem(value: 'import', child: Text('Importar datos (.json)')),
-            ],
+              );
+            },
           ),
         ],
         bottom: PreferredSize(
@@ -75,6 +95,7 @@ class HomeScreen extends ConsumerWidget {
           children: [
             const _DashboardPanel(),
             const _MyStatsPanel(),
+            const _BestThirdPlacePanel(),
             const _DateSelector(),
             matchesAsync.when(
               loading: () => const Center(
@@ -113,6 +134,7 @@ class _DashboardPanel extends ConsumerWidget {
     final isExpanded = ref.watch(dashboardExpandedProvider);
     final progress = ref.watch(worldCupProgressProvider);
     final stats = ref.watch(viewingStatsProvider);
+    final isPie = ref.watch(chartModeProvider);
     final theme = Theme.of(context);
 
     return Card(
@@ -125,7 +147,7 @@ class _DashboardPanel extends ConsumerWidget {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  const Icon(Icons.bar_chart, color: Color(0xFF009EE3)),
+                  Icon(isPie ? Icons.pie_chart : Icons.bar_chart, color: const Color(0xFF009EE3)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -155,26 +177,30 @@ class _DashboardPanel extends ConsumerWidget {
                   const SizedBox(height: 16),
                   const Text('Tus visualizaciones:'),
                   const SizedBox(height: 8),
-                  _StatBar(
-                    label: 'No visto',
-                    value: stats[UserViewingStatus.notWatched] ?? 0.0,
-                    color: Colors.red,
-                  ),
-                  _StatBar(
-                    label: 'Medio tiempo',
-                    value: stats[UserViewingStatus.halfTime] ?? 0.0,
-                    color: const Color(0xFF51EB2F),
-                  ),
-                  _StatBar(
-                    label: 'Visto',
-                    value: stats[UserViewingStatus.watched] ?? 0.0,
-                    color: Colors.green,
-                  ),
-                  _StatBar(
-                    label: 'Resumen',
-                    value: stats[UserViewingStatus.summary] ?? 0.0,
-                    color: Colors.blue,
-                  ),
+                  if (isPie)
+                    _ViewingPieChart(stats: stats)
+                  else ...[
+                    _StatBar(
+                      label: 'No visto',
+                      value: stats[UserViewingStatus.notWatched] ?? 0.0,
+                      color: Colors.red,
+                    ),
+                    _StatBar(
+                      label: 'Medio tiempo',
+                      value: stats[UserViewingStatus.halfTime] ?? 0.0,
+                      color: Colors.amber,
+                    ),
+                    _StatBar(
+                      label: 'Visto',
+                      value: stats[UserViewingStatus.watched] ?? 0.0,
+                      color: Colors.green,
+                    ),
+                    _StatBar(
+                      label: 'Resumen',
+                      value: stats[UserViewingStatus.summary] ?? 0.0,
+                      color: Colors.blue,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -186,6 +212,7 @@ class _DashboardPanel extends ConsumerWidget {
     );
   }
 }
+
 
 class _StatBar extends StatelessWidget {
   final String label;
@@ -233,6 +260,7 @@ class _MyStatsPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isExpanded = ref.watch(myStatsExpandedProvider);
     final myStats = ref.watch(myStatsProvider);
+    final isPie = ref.watch(chartModeProvider);
     final theme = Theme.of(context);
 
     final totalFinished = myStats['totalFinished'] as int;
@@ -272,23 +300,15 @@ class _MyStatsPanel extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        'Partidos finalizados: ',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                      Text(
-                        '$totalFinished',
-                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
-                      ),
+                      Text('Partidos finalizados: ', style: theme.textTheme.bodySmall),
+                      Text('$totalFinished',
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Text(
-                        'Seguimiento realizado: ',
-                        style: theme.textTheme.bodySmall,
-                      ),
+                      Text('Seguimiento realizado: ', style: theme.textTheme.bodySmall),
                       Text(
                         '$totalTracked / $totalFinished',
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -301,34 +321,38 @@ class _MyStatsPanel extends ConsumerWidget {
                   const SizedBox(height: 16),
                   const Text('Desglose de partidos finalizados:'),
                   const SizedBox(height: 8),
-                  _MyStatRow(
-                    emoji: '🟢',
-                    label: 'Visto completo',
-                    count: counts[UserViewingStatus.watched] ?? 0,
-                    percentage: percentages[UserViewingStatus.watched] ?? 0.0,
-                    color: Colors.green,
-                  ),
-                  _MyStatRow(
-                    emoji: '🟡',
-                    label: 'Medio tiempo',
-                    count: counts[UserViewingStatus.halfTime] ?? 0,
-                    percentage: percentages[UserViewingStatus.halfTime] ?? 0.0,
-                    color: const Color(0xFF51EB2F),
-                  ),
-                  _MyStatRow(
-                    emoji: '🔵',
-                    label: 'Vi el resumen',
-                    count: counts[UserViewingStatus.summary] ?? 0,
-                    percentage: percentages[UserViewingStatus.summary] ?? 0.0,
-                    color: Colors.blue,
-                  ),
-                  _MyStatRow(
-                    emoji: '🔴',
-                    label: 'No visto',
-                    count: counts[UserViewingStatus.notWatched] ?? 0,
-                    percentage: percentages[UserViewingStatus.notWatched] ?? 0.0,
-                    color: Colors.red,
-                  ),
+                  if (isPie)
+                    _MyStatsPieChart(counts: counts, total: totalFinished)
+                  else ...[
+                    _MyStatRow(
+                      emoji: '🟢',
+                      label: 'Visto completo',
+                      count: counts[UserViewingStatus.watched] ?? 0,
+                      percentage: percentages[UserViewingStatus.watched] ?? 0.0,
+                      color: Colors.green,
+                    ),
+                    _MyStatRow(
+                      emoji: '🟡',
+                      label: 'Medio tiempo',
+                      count: counts[UserViewingStatus.halfTime] ?? 0,
+                      percentage: percentages[UserViewingStatus.halfTime] ?? 0.0,
+                      color: Colors.amber,
+                    ),
+                    _MyStatRow(
+                      emoji: '🔵',
+                      label: 'Vi el resumen',
+                      count: counts[UserViewingStatus.summary] ?? 0,
+                      percentage: percentages[UserViewingStatus.summary] ?? 0.0,
+                      color: Colors.blue,
+                    ),
+                    _MyStatRow(
+                      emoji: '🔴',
+                      label: 'No visto',
+                      count: counts[UserViewingStatus.notWatched] ?? 0,
+                      percentage: percentages[UserViewingStatus.notWatched] ?? 0.0,
+                      color: Colors.red,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -340,6 +364,7 @@ class _MyStatsPanel extends ConsumerWidget {
     );
   }
 }
+
 
 class _MyStatRow extends StatelessWidget {
   final String emoji;
@@ -511,17 +536,55 @@ class _FilterChip extends StatelessWidget {
 // Selector de Fecha (Dual: Scroll horizontal + DatePicker)
 // ─────────────────────────────────────────────────────────────────────────
 
-class _DateSelector extends ConsumerWidget {
+class _DateSelector extends ConsumerStatefulWidget {
   const _DateSelector();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DateSelector> createState() => _DateSelectorState();
+}
+
+class _DateSelectorState extends ConsumerState<_DateSelector> {
+  final ScrollController _scrollController = ScrollController();
+  // Width of each chip + margin (approx)
+  static const double _chipWidth = 80.0;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToToday(List<DateTime> dates, DateTime? selectedDate) {
+    if (!_scrollController.hasClients) return;
+    // +1 because index 0 is the "Todos" chip
+    final todayIndex = selectedDate != null
+        ? dates.indexOf(selectedDate) + 1
+        : -1;
+    if (todayIndex <= 0) return;
+    final offset = (todayIndex * _chipWidth).clamp(
+      0.0,
+      _scrollController.position.maxScrollExtent,
+    );
+    _scrollController.animateTo(
+      offset,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final availableDatesAsync = ref.watch(availableDatesProvider);
     final selectedDate = ref.watch(selectedDateProvider);
 
     return availableDatesAsync.when(
       data: (dates) {
         if (dates.isEmpty) return const SizedBox.shrink();
+
+        // Auto-scroll after the first frame is laid out
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToToday(dates, selectedDate);
+        });
 
         return Column(
           children: [
@@ -549,6 +612,7 @@ class _DateSelector extends ConsumerWidget {
               ),
             ),
             SingleChildScrollView(
+              controller: _scrollController,
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
@@ -576,6 +640,7 @@ class _DateSelector extends ConsumerWidget {
     );
   }
 }
+
 
 class _DateChip extends StatelessWidget {
   final String label;
@@ -765,8 +830,9 @@ Future<void> _confirmAutoFill(BuildContext context, WidgetRef ref) async {
   }
 }
 
-void _showExportDialog(BuildContext context, WidgetRef ref) {
-  final jsonStr = ref.read(matchesNotifierProvider.notifier).exportStatusesJson();
+Future<void> _showExportDialog(BuildContext context, WidgetRef ref) async {
+  final jsonStr = await ref.read(matchesNotifierProvider.notifier).exportStatusesJson();
+  if (!context.mounted) return;
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
@@ -805,6 +871,8 @@ void _showExportDialog(BuildContext context, WidgetRef ref) {
     ),
   );
 }
+
+
 
 void _showImportDialog(BuildContext context, WidgetRef ref) {
   final controller = TextEditingController();
@@ -852,4 +920,302 @@ void _showImportDialog(BuildContext context, WidgetRef ref) {
       ],
     ),
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Gráficos de Torta (Pie Charts)
+// ─────────────────────────────────────────────────────────────────────────
+
+class _ViewingPieChart extends StatefulWidget {
+  final Map<UserViewingStatus, double> stats;
+
+  const _ViewingPieChart({required this.stats});
+
+  @override
+  State<_ViewingPieChart> createState() => _ViewingPieChartState();
+}
+
+class _ViewingPieChartState extends State<_ViewingPieChart> {
+  int touchedIndex = -1;
+
+  @override
+  Widget build(BuildContext context) {
+    final notWatched = widget.stats[UserViewingStatus.notWatched] ?? 0.0;
+    final halfTime = widget.stats[UserViewingStatus.halfTime] ?? 0.0;
+    final watched = widget.stats[UserViewingStatus.watched] ?? 0.0;
+    final summary = widget.stats[UserViewingStatus.summary] ?? 0.0;
+    
+    // Si todos son 0, no mostrar gráfico para evitar división por 0
+    if (notWatched == 0 && halfTime == 0 && watched == 0 && summary == 0) {
+      return const SizedBox(height: 150, child: Center(child: Text('Sin datos aún')));
+    }
+
+    return SizedBox(
+      height: 200,
+      child: PieChart(
+        PieChartData(
+          pieTouchData: PieTouchData(
+            touchCallback: (FlTouchEvent event, pieTouchResponse) {
+              setState(() {
+                if (!event.isInterestedForInteractions ||
+                    pieTouchResponse == null ||
+                    pieTouchResponse.touchedSection == null) {
+                  touchedIndex = -1;
+                  return;
+                }
+                touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+              });
+            },
+          ),
+          sectionsSpace: 2,
+          centerSpaceRadius: 20,
+          sections: [
+            PieChartSectionData(
+              color: Colors.green,
+              value: watched,
+              title: touchedIndex == 0 ? '🟢 ${(watched * 100).toStringAsFixed(0)}%' : '${(watched * 100).toStringAsFixed(0)}%',
+              radius: touchedIndex == 0 ? 60 : 50,
+              titleStyle: TextStyle(fontSize: touchedIndex == 0 ? 14 : 12, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            PieChartSectionData(
+              color: Colors.amber,
+              value: halfTime,
+              title: touchedIndex == 1 ? '🟡 ${(halfTime * 100).toStringAsFixed(0)}%' : '${(halfTime * 100).toStringAsFixed(0)}%',
+              radius: touchedIndex == 1 ? 60 : 50,
+              titleStyle: TextStyle(fontSize: touchedIndex == 1 ? 14 : 12, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            PieChartSectionData(
+              color: Colors.blue,
+              value: summary,
+              title: touchedIndex == 2 ? '🔵 ${(summary * 100).toStringAsFixed(0)}%' : '${(summary * 100).toStringAsFixed(0)}%',
+              radius: touchedIndex == 2 ? 60 : 50,
+              titleStyle: TextStyle(fontSize: touchedIndex == 2 ? 14 : 12, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            PieChartSectionData(
+              color: Colors.red,
+              value: notWatched,
+              title: touchedIndex == 3 ? '🔴 ${(notWatched * 100).toStringAsFixed(0)}%' : '${(notWatched * 100).toStringAsFixed(0)}%',
+              radius: touchedIndex == 3 ? 60 : 50,
+              titleStyle: TextStyle(fontSize: touchedIndex == 3 ? 14 : 12, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MyStatsPieChart extends StatefulWidget {
+  final Map<UserViewingStatus, int> counts;
+  final int total;
+
+  const _MyStatsPieChart({required this.counts, required this.total});
+
+  @override
+  State<_MyStatsPieChart> createState() => _MyStatsPieChartState();
+}
+
+class _MyStatsPieChartState extends State<_MyStatsPieChart> {
+  int touchedIndex = -1;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.total == 0) {
+      return const SizedBox(height: 150, child: Center(child: Text('Sin datos aún')));
+    }
+
+    final notWatched = (widget.counts[UserViewingStatus.notWatched] ?? 0).toDouble();
+    final halfTime = (widget.counts[UserViewingStatus.halfTime] ?? 0).toDouble();
+    final watched = (widget.counts[UserViewingStatus.watched] ?? 0).toDouble();
+    final summary = (widget.counts[UserViewingStatus.summary] ?? 0).toDouble();
+
+    return SizedBox(
+      height: 200,
+      child: PieChart(
+        PieChartData(
+          pieTouchData: PieTouchData(
+            touchCallback: (FlTouchEvent event, pieTouchResponse) {
+              setState(() {
+                if (!event.isInterestedForInteractions ||
+                    pieTouchResponse == null ||
+                    pieTouchResponse.touchedSection == null) {
+                  touchedIndex = -1;
+                  return;
+                }
+                touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+              });
+            },
+          ),
+          sectionsSpace: 2,
+          centerSpaceRadius: 20,
+          sections: [
+            PieChartSectionData(
+              color: Colors.green,
+              value: watched,
+              title: touchedIndex == 0 ? '🟢 ${watched.toInt()}' : '${watched.toInt()}',
+              radius: touchedIndex == 0 ? 60 : 50,
+              titleStyle: TextStyle(fontSize: touchedIndex == 0 ? 16 : 14, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            PieChartSectionData(
+              color: Colors.amber,
+              value: halfTime,
+              title: touchedIndex == 1 ? '🟡 ${halfTime.toInt()}' : '${halfTime.toInt()}',
+              radius: touchedIndex == 1 ? 60 : 50,
+              titleStyle: TextStyle(fontSize: touchedIndex == 1 ? 16 : 14, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            PieChartSectionData(
+              color: Colors.blue,
+              value: summary,
+              title: touchedIndex == 2 ? '🔵 ${summary.toInt()}' : '${summary.toInt()}',
+              radius: touchedIndex == 2 ? 60 : 50,
+              titleStyle: TextStyle(fontSize: touchedIndex == 2 ? 16 : 14, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            PieChartSectionData(
+              color: Colors.red,
+              value: notWatched,
+              title: touchedIndex == 3 ? '🔴 ${notWatched.toInt()}' : '${notWatched.toInt()}',
+              radius: touchedIndex == 3 ? 60 : 50,
+              titleStyle: TextStyle(fontSize: touchedIndex == 3 ? 16 : 14, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Ranking Mejores Terceros
+// ─────────────────────────────────────────────────────────────────────────
+
+final bestThirdPlaceExpandedProvider = StateProvider<bool>((ref) => false);
+
+class _BestThirdPlacePanel extends ConsumerWidget {
+  const _BestThirdPlacePanel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isExpanded = ref.watch(bestThirdPlaceExpandedProvider);
+    final standingsAsync = ref.watch(bestThirdPlaceProvider);
+    final theme = Theme.of(context);
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => ref.read(bestThirdPlaceExpandedProvider.notifier).state = !isExpanded,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Icon(Icons.format_list_numbered, color: Color(0xFF009EE3)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Ranking Mejores Terceros',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity, height: 0),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: standingsAsync.when(
+                data: (standings) {
+                  if (standings.isEmpty) {
+                    return const Text('No hay datos disponibles.');
+                  }
+                  
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          const SizedBox(width: 24), // Para la posición
+                          const SizedBox(width: 28), // Para la bandera
+                          Expanded(child: Text('Equipo', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+                          SizedBox(width: 30, child: Text('PJ', textAlign: TextAlign.center, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+                          SizedBox(width: 30, child: Text('DG', textAlign: TextAlign.center, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+                          SizedBox(width: 30, child: Text('Pts', textAlign: TextAlign.center, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+                        ],
+                      ),
+                      const Divider(),
+                      ...standings.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final s = entry.value;
+                        // En Mundial de 48 clasifican los 8 mejores terceros
+                        final isQualified = index < 8;
+                        
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: isQualified ? Colors.green : Colors.grey,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 28,
+                                child: s.crestUrl != null
+                                    ? (s.crestUrl!.endsWith('.svg')
+                                        ? SvgPicture.network(s.crestUrl!, width: 20, height: 20)
+                                        : CachedNetworkImage(imageUrl: s.crestUrl!, width: 20, height: 20, errorWidget: (c,u,e) => const Icon(Icons.flag, size: 20)))
+                                    : const Icon(Icons.flag, size: 20),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      s.teamName,
+                                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      s.groupLabel,
+                                      style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(width: 30, child: Text('${s.playedGames}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13))),
+                              SizedBox(width: 30, child: Text('${s.goalDifference > 0 ? '+' : ''}${s.goalDifference}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13))),
+                              SizedBox(width: 30, child: Text('${s.points}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                            ],
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Container(width: 12, height: 12, color: Colors.green),
+                          const SizedBox(width: 8),
+                          const Text('Clasifican (8 mejores)', style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, st) => Text('Error: $e'),
+              ),
+            ),
+            crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+          ),
+        ],
+      ),
+    );
+  }
 }

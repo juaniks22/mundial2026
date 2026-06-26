@@ -169,7 +169,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Aguantee Boocaa',
+                      'Etaa locuraaa',
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         color: const Color(0xFF009EE3),
