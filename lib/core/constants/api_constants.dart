@@ -1,9 +1,14 @@
 // lib/core/constants/api_constants.dart
 
+import 'package:flutter/foundation.dart';
+
 class ApiConstants {
   ApiConstants._();
 
-  static const String baseUrl = 'https://api.football-data.org/v4';
+  // Se usa un proxy CORS en Web para evitar el error de XMLHttpRequest (CORS)
+  static const String baseUrl = kIsWeb 
+      ? 'https://corsproxy.io/?https://api.football-data.org/v4'
+      : 'https://api.football-data.org/v4';
 
   /// Obtené tu key gratuita en https://www.football-data.org/client/register
   static const String apiKey = 'a5293dba45b541dcb7163e20dd52c8dd';
@@ -35,6 +40,10 @@ class HiveConstants {
   /// Box donde se guarda el estado personal de cada partido.
   /// Key: matchId (String) → Value: índice del enum UserViewingStatus (int)
   static const String statusBox = 'user_viewing_status';
+
+  /// Box donde se guarda si el usuario vio el alargue del partido.
+  /// Key: matchId (String) → Value: bool
+  static const String extraTimeBox = 'user_extra_time';
 
   /// Box donde se cachea el fixture completo como JSON.
   /// Key: 'matches' → Value: JSON string

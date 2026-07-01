@@ -25,6 +25,12 @@ abstract class MatchRepositoryPort {
   /// Obtiene todos los estados de visualización personal almacenados en Hive.
   Future<Map<String, UserViewingStatus>> getAllViewingStatuses();
 
+  /// Actualiza si el usuario vio el alargue de un partido eliminatorio.
+  Future<void> updateExtraTimeStatus(String matchId, bool watched);
+
+  /// Obtiene todos los estados de alargue almacenados.
+  Future<Map<String, bool>> getAllExtraTimeStatuses();
+
   /// Obtiene las tablas de posiciones de todos los grupos del torneo.
   Future<List<GroupStanding>> getStandings();
 }

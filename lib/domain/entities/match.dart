@@ -133,6 +133,7 @@ class Match {
 
   // ── ESTADO PERSONAL (local, NO viene de la API) ──────────────────────────
   final UserViewingStatus userViewingStatus;
+  final bool watchedExtraTime;
   final DateTime? userStatusUpdatedAt;
 
   const Match({
@@ -149,6 +150,7 @@ class Match {
     this.venue,
     this.refereeMain,
     this.userViewingStatus = UserViewingStatus.notWatched,
+    this.watchedExtraTime = false,
     this.userStatusUpdatedAt,
   });
 
@@ -163,6 +165,7 @@ class Match {
     Team? homeTeam,
     Team? awayTeam,
     UserViewingStatus? userViewingStatus,
+    bool? watchedExtraTime,
     DateTime? userStatusUpdatedAt,
   }) {
     return Match(
@@ -179,6 +182,7 @@ class Match {
       refereeMain: refereeMain,
       lastUpdated: lastUpdated,
       userViewingStatus: userViewingStatus ?? this.userViewingStatus,
+      watchedExtraTime: watchedExtraTime ?? this.watchedExtraTime,
       userStatusUpdatedAt: userStatusUpdatedAt ?? this.userStatusUpdatedAt,
     );
   }
@@ -230,7 +234,7 @@ extension MatchStageX on MatchStage {
   String get label {
     switch (this) {
       case MatchStage.groupStage:   return 'Fase de Grupos';
-      case MatchStage.roundOf32:    return 'Ronda de 32';
+      case MatchStage.roundOf32:    return '16avos';
       case MatchStage.roundOf16:    return 'Octavos de Final';
       case MatchStage.quarterFinal: return 'Cuartos de Final';
       case MatchStage.semiFinal:    return 'Semifinales';

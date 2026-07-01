@@ -15,6 +15,15 @@ abstract class LocalDataSourcePort {
   /// Lee todos los estados guardados como Map<matchId, UserViewingStatus>.
   Map<String, UserViewingStatus> readAllViewingStatuses();
 
+  /// Guarda si se vio el alargue de un partido eliminatorio.
+  Future<void> saveExtraTimeStatus(String matchId, bool watched);
+
+  /// Lee si se vio el alargue de un partido eliminatorio.
+  bool readExtraTimeStatus(String matchId);
+
+  /// Lee todos los estados de alargue guardados.
+  Map<String, bool> readAllExtraTimeStatuses();
+
   // ── Caché del fixture ────────────────────────────────────────────────────
 
   /// Guarda la lista completa de partidos como JSON serializado.

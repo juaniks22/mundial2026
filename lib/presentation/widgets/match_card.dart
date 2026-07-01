@@ -43,17 +43,30 @@ class MatchCard extends ConsumerWidget {
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(ThemeData theme) {
+    final stageColor = _stageColor(match.stage);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Grupo o fase
-        Text(
-          match.group != null
-              ? 'Grupo ${match.group!.replaceAll('GROUP_', '')}'
-              : match.stage.label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w600,
+        // Grupo o fase con color por etapa
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: stageColor.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: stageColor,
+              width: 1,
+            ),
+          ),
+          child: Text(
+            match.group != null
+                ? 'Grupo ${match.group!.replaceAll('GROUP_', '')}'
+                : match.stage.label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.black87,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
 
@@ -164,10 +177,15 @@ class MatchCard extends ConsumerWidget {
         matchId: match.id,
         matchLabel: '${match.homeTeam.tla} vs ${match.awayTeam.tla}',
         current: match.userViewingStatus,
-        onSelect: (status) {
+        watchedExtraTime: match.watchedExtraTime,
+        stage: match.stage,
+        onSelect: (status, extraTime) {
           ref
               .read(matchesNotifierProvider.notifier)
               .updateViewingStatus(match.id, status);
+          ref
+              .read(matchesNotifierProvider.notifier)
+              .updateExtraTimeStatus(match.id, extraTime);
           Navigator.pop(context);
         },
       ),
@@ -317,3 +335,15 @@ class _ViewingStatusBadge extends StatelessWidget {
     UserViewingStatus.summary    => Colors.blue,
   };
 }
+
+/// Retorna un color profesional por cada fase del Mundial.
+Color _stageColor(MatchStage stage) => switch (stage) {
+  MatchStage.groupStage   => const Color(0xFFFFD700), // Dorado
+  MatchStage.roundOf32    => const Color(0xFF81D4FA), // Azul claro
+  MatchStage.roundOf16    => const Color(0xFFCE93D8), // Violeta
+  MatchStage.quarterFinal => const Color(0xFFEF9A9A), // Rojo suave
+  MatchStage.semiFinal    => const Color(0xFFE0E0E0), // Blanco plateado
+  MatchStage.thirdPlace   => const Color(0xFFE0E0E0), // Blanco plateado
+  MatchStage.final_       => const Color(0xFFE0E0E0), // Blanco plateado
+  MatchStage.unknown      => const Color(0xFF757575), // Gris
+};

@@ -3,19 +3,38 @@
 import 'package:flutter/material.dart';
 import 'package:mundial2026/domain/entities/match.dart';
 
-class ViewingStatusSelector extends StatelessWidget {
+class ViewingStatusSelector extends StatefulWidget {
   final String matchId;
   final String matchLabel;
   final UserViewingStatus current;
-  final void Function(UserViewingStatus) onSelect;
+  final bool watchedExtraTime;
+  final MatchStage stage;
+  final void Function(UserViewingStatus status, bool extraTime) onSelect;
 
   const ViewingStatusSelector({
     super.key,
     required this.matchId,
     required this.matchLabel,
     required this.current,
+    required this.watchedExtraTime,
+    required this.stage,
     required this.onSelect,
   });
+
+  @override
+  State<ViewingStatusSelector> createState() => _ViewingStatusSelectorState();
+}
+
+class _ViewingStatusSelectorState extends State<ViewingStatusSelector> {
+  late bool _extraTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _extraTime = widget.watchedExtraTime;
+  }
+
+  bool get _isKnockoutStage => widget.stage != MatchStage.groupStage && widget.stage != MatchStage.unknown;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +59,7 @@ class ViewingStatusSelector extends StatelessWidget {
           const SizedBox(height: 16),
 
           Text(
-            matchLabel,
+            widget.matchLabel,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -53,14 +72,46 @@ class ViewingStatusSelector extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Opciones
+          // Opciones de estado
           ...UserViewingStatus.values.map(
             (status) => _StatusOption(
               status: status,
-              isSelected: status == current,
-              onTap: () => onSelect(status),
+              isSelected: status == widget.current,
+              onTap: () => widget.onSelect(status, _extraTime),
             ),
           ),
+
+          // Checkbox de Alargue (solo para eliminatorias)
+          if (_isKnockoutStage) ...[
+            const SizedBox(height: 8),
+            const Divider(),
+            CheckboxListTile(
+              value: _extraTime,
+              onChanged: (val) {
+                setState(() => _extraTime = val ?? false);
+                // Si ya tiene un estado, lo persistimos al togglear
+                widget.onSelect(widget.current, _extraTime);
+              },
+              title: Row(
+                children: [
+                  const Text('⏱️', style: TextStyle(fontSize: 20)),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Jugó alargue (+30 min)',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: _extraTime ? FontWeight.bold : FontWeight.normal,
+                      color: _extraTime ? const Color(0xFFE65100) : null,
+                    ),
+                  ),
+                ],
+              ),
+              activeColor: const Color(0xFFE65100),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+          ],
         ],
       ),
     );

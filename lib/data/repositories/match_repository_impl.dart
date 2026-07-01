@@ -59,6 +59,16 @@ class MatchRepositoryImpl implements MatchRepositoryPort {
     return _local.readAllViewingStatuses();
   }
 
+  @override
+  Future<void> updateExtraTimeStatus(String matchId, bool watched) async {
+    await _local.saveExtraTimeStatus(matchId, watched);
+  }
+
+  @override
+  Future<Map<String, bool>> getAllExtraTimeStatuses() async {
+    return _local.readAllExtraTimeStatuses();
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Standings (tablas de grupo)
   // ─────────────────────────────────────────────────────────────────────────
@@ -87,9 +97,14 @@ class MatchRepositoryImpl implements MatchRepositoryPort {
 
   List<Match> _mergeWithLocalStatuses(List<Match> apiMatches) {
     final statuses = _local.readAllViewingStatuses();
+    final extraTimeStatuses = _local.readAllExtraTimeStatuses();
     return apiMatches.map((match) {
       final localStatus = statuses[match.id] ?? UserViewingStatus.notWatched;
-      return match.copyWith(userViewingStatus: localStatus);
+      final extraTime = extraTimeStatuses[match.id] ?? false;
+      return match.copyWith(
+        userViewingStatus: localStatus,
+        watchedExtraTime: extraTime,
+      );
     }).toList();
   }
 }

@@ -24,6 +24,7 @@ Future<void> main() async {
   // Hive las crea si no existen; las carga si ya existen.
   await Future.wait([
     Hive.openBox<int>(HiveConstants.statusBox),    // estados personales
+    Hive.openBox<bool>(HiveConstants.extraTimeBox),// alargue
     Hive.openBox<String>(HiveConstants.cacheBox),  // caché del fixture
   ]);
 

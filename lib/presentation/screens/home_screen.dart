@@ -256,15 +256,26 @@ class _StatBar extends StatelessWidget {
 class _MyStatsPanel extends ConsumerWidget {
   const _MyStatsPanel();
 
+  static String _formatMinutes(int totalMinutes) {
+    final hours = totalMinutes ~/ 60;
+    final mins = totalMinutes % 60;
+    if (hours == 0) return '${mins}m';
+    if (mins == 0) return '${hours}h';
+    return '${hours}h ${mins}m';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isExpanded = ref.watch(myStatsExpandedProvider);
     final myStats = ref.watch(myStatsProvider);
     final isPie = ref.watch(chartModeProvider);
+    final currentFilter = ref.watch(myStatsFilterProvider);
     final theme = Theme.of(context);
 
     final totalFinished = myStats['totalFinished'] as int;
     final totalTracked = myStats['totalTracked'] as int;
+    final totalMinutesViewed = myStats['totalMinutesViewed'] as int;
+    final extraTimeCount = myStats['extraTimeCount'] as int;
     final counts = myStats['counts'] as Map<UserViewingStatus, int>;
     final percentages = myStats['percentages'] as Map<UserViewingStatus, double>;
 
@@ -298,6 +309,34 @@ class _MyStatsPanel extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Selector de fase/fecha
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: StatsFilter.values.map((filterOption) {
+                        final isSelected = currentFilter == filterOption;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            label: Text(filterOption.label, style: const TextStyle(fontSize: 11)),
+                            selected: isSelected,
+                            onSelected: (_) => ref.read(myStatsFilterProvider.notifier).state = filterOption,
+                            selectedColor: filterOption.color?.withValues(alpha: 0.6) ?? theme.colorScheme.primary,
+                            backgroundColor: filterOption.color?.withValues(alpha: 0.2),
+                            labelStyle: TextStyle(
+                              color: isSelected
+                                  ? (filterOption.color != null ? Colors.black87 : theme.colorScheme.onPrimary)
+                                  : theme.colorScheme.onSurface,
+                              fontSize: 11,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Text('Partidos finalizados: ', style: theme.textTheme.bodySmall),
@@ -316,6 +355,31 @@ class _MyStatsPanel extends ConsumerWidget {
                           color: const Color(0xFF009EE3),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  // Tiempo de fútbol aproximado visto
+                  Row(
+                    children: [
+                      //const Text('⌚ ', style: TextStyle(fontSize: 14)),
+                      Text('Tiempo aprox visto: ', style: theme.textTheme.bodySmall),
+                      Text(
+                        _formatMinutes(totalMinutesViewed),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF009EE3),
+                        ),
+                      ),
+                      if (extraTimeCount > 0) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          '(⏱ $extraTimeCount con alargue)',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFFE65100),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -576,6 +640,7 @@ class _DateSelectorState extends ConsumerState<_DateSelector> {
   Widget build(BuildContext context) {
     final availableDatesAsync = ref.watch(availableDatesProvider);
     final selectedDate = ref.watch(selectedDateProvider);
+    final matches = ref.watch(matchesNotifierProvider).valueOrNull ?? [];
 
     return availableDatesAsync.when(
       data: (dates) {
@@ -591,9 +656,21 @@ class _DateSelectorState extends ConsumerState<_DateSelector> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Filtrar por fecha:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  ChoiceChip(
+                    label: const Text('Todos'),
+                    selected: selectedDate == null,
+                    onSelected: (_) => ref.read(selectedDateProvider.notifier).state = null,
+                    selectedColor: Theme.of(context).colorScheme.primary,
+                    labelStyle: TextStyle(
+                      color: selectedDate == null
+                          ? Theme.of(context).colorScheme.onPrimary
+                          : Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.calendar_month, color: Color(0xFF009EE3)),
                     onPressed: () async {
@@ -617,15 +694,11 @@ class _DateSelectorState extends ConsumerState<_DateSelector> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: [
-                  _DateChip(
-                    label: 'Todos',
-                    isSelected: selectedDate == null,
-                    onTap: () => ref.read(selectedDateProvider.notifier).state = null,
-                  ),
                   for (final date in dates)
                     _DateChip(
                       label: DateFormat('d MMM').format(date),
                       isSelected: selectedDate == date,
+                      baseColor: _getColorForDate(date, matches),
                       onTap: () => ref.read(selectedDateProvider.notifier).state = date,
                     ),
                 ],
@@ -642,12 +715,38 @@ class _DateSelectorState extends ConsumerState<_DateSelector> {
 }
 
 
+Color? _getColorForDate(DateTime date, List<Match> matches) {
+  for (final m in matches) {
+    if (m.utcDate.year == date.year && m.utcDate.month == date.month && m.utcDate.day == date.day) {
+      return _stageColorForDateChip(m.stage);
+    }
+  }
+  return null;
+}
+
+Color _stageColorForDateChip(MatchStage stage) => switch (stage) {
+  MatchStage.groupStage   => const Color(0xFFFFD700), // Dorado
+  MatchStage.roundOf32    => const Color(0xFF81D4FA), // Azul claro
+  MatchStage.roundOf16    => const Color(0xFFCE93D8), // Violeta
+  MatchStage.quarterFinal => const Color(0xFFEF9A9A), // Rojo suave
+  MatchStage.semiFinal    => const Color(0xFFE0E0E0), // Blanco plateado
+  MatchStage.thirdPlace   => const Color(0xFFE0E0E0), // Blanco plateado
+  MatchStage.final_       => const Color(0xFFE0E0E0), // Blanco plateado
+  MatchStage.unknown      => const Color(0xFF757575), // Gris
+};
+
 class _DateChip extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
+  final Color? baseColor;
 
-  const _DateChip({required this.label, required this.isSelected, required this.onTap});
+  const _DateChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    this.baseColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -658,9 +757,13 @@ class _DateChip extends StatelessWidget {
         label: Text(label),
         selected: isSelected,
         onSelected: (_) => onTap(),
-        selectedColor: theme.colorScheme.primary,
+        selectedColor: baseColor?.withValues(alpha: 0.6) ?? theme.colorScheme.primary,
+        backgroundColor: baseColor?.withValues(alpha: 0.2),
         labelStyle: TextStyle(
-          color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
+          color: isSelected
+              ? (baseColor != null ? Colors.black87 : theme.colorScheme.onPrimary)
+              : theme.colorScheme.onSurface,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
       ),
     );

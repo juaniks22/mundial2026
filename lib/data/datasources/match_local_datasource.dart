@@ -19,12 +19,15 @@ import '../../domain/ports/local_datasource_port.dart';
 class MatchLocalDataSource implements LocalDataSourcePort {
   // Hive boxes inyectadas desde main.dart (ya abiertas al arrancar la app).
   final Box<int> _statusBox;
+  final Box<bool> _extraTimeBox;
   final Box<String> _cacheBox;
 
   MatchLocalDataSource({
     required Box<int> statusBox,
+    required Box<bool> extraTimeBox,
     required Box<String> cacheBox,
   })  : _statusBox = statusBox,
+        _extraTimeBox = extraTimeBox,
         _cacheBox = cacheBox;
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -59,6 +62,28 @@ class MatchLocalDataSource implements LocalDataSourcePort {
         key: UserViewingStatus.values[
           _statusBox.get(key)!.clamp(0, UserViewingStatus.values.length - 1)
         ],
+    };
+  }
+
+  @override
+  Future<void> saveExtraTimeStatus(String matchId, bool watched) async {
+    try {
+      await _extraTimeBox.put(matchId, watched);
+    } catch (e) {
+      throw CacheException('No se pudo guardar el estado de alargue', cause: e);
+    }
+  }
+
+  @override
+  bool readExtraTimeStatus(String matchId) {
+    return _extraTimeBox.get(matchId) ?? false;
+  }
+
+  @override
+  Map<String, bool> readAllExtraTimeStatuses() {
+    return {
+      for (final key in _extraTimeBox.keys.cast<String>())
+        key: _extraTimeBox.get(key)!,
     };
   }
 

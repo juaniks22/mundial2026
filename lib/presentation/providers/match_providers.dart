@@ -11,6 +11,7 @@
 //   filterStateProvider      → FilterState (filtros activos)
 //   filteredMatchesProvider  → List<Match> derivada con filtros aplicados
 
+import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +40,7 @@ final localDataSourceProvider = Provider<MatchLocalDataSource>((ref) {
   // Las boxes ya deben estar abiertas en main.dart antes de runApp.
   return MatchLocalDataSource(
     statusBox: Hive.box<int>(HiveConstants.statusBox),
+    extraTimeBox: Hive.box<bool>(HiveConstants.extraTimeBox),
     cacheBox: Hive.box<String>(HiveConstants.cacheBox),
   );
 });
@@ -183,6 +185,17 @@ class MatchesNotifier extends AsyncNotifier<List<Match>> {
     state = state.whenData(
       (matches) => matches
           .map((m) => m.id == matchId ? m.copyWith(userViewingStatus: newStatus) : m)
+          .toList(),
+    );
+  }
+
+  /// Actualiza si el usuario vio el alargue de un partido eliminatorio.
+  Future<void> updateExtraTimeStatus(String matchId, bool watched) async {
+    await ref.read(matchRepositoryProvider).updateExtraTimeStatus(matchId, watched);
+
+    state = state.whenData(
+      (matches) => matches
+          .map((m) => m.id == matchId ? m.copyWith(watchedExtraTime: watched) : m)
           .toList(),
     );
   }
@@ -354,36 +367,114 @@ final viewingStatsProvider = Provider<Map<UserViewingStatus, double>>((ref) {
 // MIS ESTADÍSTICAS (solo partidos finalizados con estado cargado por el usuario)
 // ═══════════════════════════════════════════════════════════════════════════
 
+enum StatsFilter {
+  total('Total', null),
+  groupStage('Fase de Grupos', Color(0xFFFFD700)),
+  matchday1('Fecha 1', Color(0xFFFFD700)),
+  matchday2('Fecha 2', Color(0xFFFFD700)),
+  matchday3('Fecha 3', Color(0xFFFFD700)),
+  roundOf32('16avos', Color(0xFF81D4FA)),
+  roundOf16('Octavos', Color(0xFFCE93D8)),
+  quarterFinal('Cuartos', Color(0xFFEF9A9A)),
+  finals('Finales', Color(0xFFE0E0E0));
+
+  final String label;
+  final Color? color;
+  const StatsFilter(this.label, this.color);
+}
+
+/// Filtro para “Mis Estadísticas”.
+final myStatsFilterProvider = StateProvider<StatsFilter>((ref) => StatsFilter.total);
+
 /// Estadísticas personales del usuario: cuántos partidos finalizados marcó
 /// con cada estado. Solo cuenta partidos con status == finished.
+/// Ahora incluye filtro por fase/fecha y cálculo de minutos aproximados vistos.
 final myStatsProvider = Provider<Map<String, dynamic>>((ref) {
   final matches = ref.watch(matchesNotifierProvider).valueOrNull ?? [];
-  final finished = matches.where((m) => m.status == MatchStatus.finished).toList();
-  
+  final filter = ref.watch(myStatsFilterProvider);
+
+  var finished = matches.where((m) => m.status == MatchStatus.finished).toList();
+
+  // Aplicar filtro de fase o fecha
+  switch (filter) {
+    case StatsFilter.total:
+      break;
+    case StatsFilter.groupStage:
+      finished = finished.where((m) => m.stage == MatchStage.groupStage).toList();
+      break;
+    case StatsFilter.matchday1:
+      finished = finished.where((m) => m.stage == MatchStage.groupStage && m.matchday == 1).toList();
+      break;
+    case StatsFilter.matchday2:
+      finished = finished.where((m) => m.stage == MatchStage.groupStage && m.matchday == 2).toList();
+      break;
+    case StatsFilter.matchday3:
+      finished = finished.where((m) => m.stage == MatchStage.groupStage && m.matchday == 3).toList();
+      break;
+    case StatsFilter.roundOf32:
+      finished = finished.where((m) => m.stage == MatchStage.roundOf32).toList();
+      break;
+    case StatsFilter.roundOf16:
+      finished = finished.where((m) => m.stage == MatchStage.roundOf16).toList();
+      break;
+    case StatsFilter.quarterFinal:
+      finished = finished.where((m) => m.stage == MatchStage.quarterFinal).toList();
+      break;
+    case StatsFilter.finals:
+      finished = finished.where((m) => 
+        m.stage == MatchStage.semiFinal || 
+        m.stage == MatchStage.thirdPlace || 
+        m.stage == MatchStage.final_
+      ).toList();
+      break;
+  }
+
   final counts = {
     UserViewingStatus.notWatched: 0,
     UserViewingStatus.halfTime: 0,
     UserViewingStatus.watched: 0,
     UserViewingStatus.summary: 0,
   };
-  
+
+  int totalMinutesViewed = 0;
+
   for (final m in finished) {
     counts[m.userViewingStatus] = (counts[m.userViewingStatus] ?? 0) + 1;
+
+    // Cálculo de minutos según estado de visualización
+    switch (m.userViewingStatus) {
+      case UserViewingStatus.notWatched:
+        // 0 min
+        break;
+      case UserViewingStatus.summary:
+        totalMinutesViewed += 10;
+        break;
+      case UserViewingStatus.halfTime:
+        totalMinutesViewed += 50;
+        break;
+      case UserViewingStatus.watched:
+        totalMinutesViewed += 90;
+        if (m.watchedExtraTime) totalMinutesViewed += 30;
+        break;
+    }
   }
-  
+
   final totalFinished = finished.length;
   final totalTracked = totalFinished - (counts[UserViewingStatus.notWatched] ?? 0);
-  
+  final extraTimeCount = finished.where((m) => m.watchedExtraTime).length;
+
   final percentages = <UserViewingStatus, double>{};
   for (final entry in counts.entries) {
     percentages[entry.key] = totalFinished > 0 ? entry.value / totalFinished : 0.0;
   }
-  
+
   return {
     'totalFinished': totalFinished,
     'totalTracked': totalTracked,
     'counts': counts,
     'percentages': percentages,
+    'totalMinutesViewed': totalMinutesViewed,
+    'extraTimeCount': extraTimeCount,
   };
 });
 
